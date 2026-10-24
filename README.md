@@ -11,6 +11,7 @@ Web kalkulator **površine i mase limenih ventilacijskih kanala i fazona** (prav
 - **Dodatak za spojeve, prirubnice i ukrute** u % neto mase (tipično 10–20 %)
 - Zbroj površine i mase te pregled po materijalu
 - **Automatsko spremanje** projekta u preglednik (`localStorage`) kod svake promjene
+- **Spremanje i otvaranje projekta kao `.json` datoteke** za arhivu, prijenos na drugo računalo ili slanje kolegi
 - Izvoz u CSV (separator `;`, UTF-8 s BOM-om, otvara se izravno u Excelu)
 - Ispis / PDF u formatu A4 landscape sa zaglavljem projekta
 
@@ -54,6 +55,23 @@ Masa: **m = S × δ × ρ**, a ukupna masa: **m_ukupno = m × (1 + dodatak / 100
 | Nehrđajući čelik | 7900 |
 | Aluminij | 2700 |
 
+## Datoteka projekta (.json)
+
+**Spremi projekt** preuzima datoteku `<naziv_projekta>.json`. **Otvori projekt** je učitava i zamjenjuje trenutni projekt (prije toga traži potvrdu).
+
+```json
+{
+  "format": "hvac-masa-kanala",
+  "version": 1,
+  "savedAt": "2026-10-24T12:00:00.000Z",
+  "title": "Stambena zgrada A",
+  "allowancePct": 12,
+  "items": [ { "type": "duct", "shape": "rectangular", "a": 500, "b": 300, "length": 12, "material": "galvanized", "...": "..." } ]
+}
+```
+
+Kod otvaranja se svaka stavka provjerava. Nedostajuća ili neispravna polja (npr. tekst umjesto broja, negativne dimenzije, nepoznat tip ili materijal) zamjenjuju se zadanim vrijednostima. Površina i masa uvijek se ponovno izračunavaju, a ne preuzimaju iz datoteke.
+
 ## Pokretanje
 
 Potreban je Node.js 22 ili noviji.
@@ -85,5 +103,5 @@ GitHub Actions (`.github/workflows/ci.yml`) kod svakog pusha i pull requesta pok
 
 ## Napomene
 
-- Podaci se spremaju samo u preglednik na tom računalu. Ako se obriše povijest preglednika, projekt se gubi. Za arhivu koristite **Izvoz CSV**.
+- Automatsko spremanje vrijedi samo u pregledniku na tom računalu. Ako se obriše povijest preglednika, projekt se gubi. Za arhivu koristite **Spremi projekt** (.json). CSV služi za Excel i ne može se ponovno otvoriti u kalkulatoru.
 - Površina T-komada je približna procjena. Za točan iznos koristite stavku tipa *Prilagođeno*.

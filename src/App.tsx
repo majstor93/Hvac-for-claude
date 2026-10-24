@@ -1,10 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import type { DuctItem } from './types'
 import { MATERIAL_LABELS } from './types'
 import DuctTable from './components/DuctTable'
 import { normalizeItem } from './utils/items'
 
 const PROJECT_KEY = 'hvac_project_v1'
+
+// Marker and version written to project files (.json)
+const FILE_FORMAT = 'hvac-masa-kanala'
+const FILE_VERSION = 1
 
 interface Project {
   title: string
@@ -13,20 +18,47 @@ interface Project {
   allowancePct: number
 }
 
+const EMPTY_PROJECT: Project = { title: 'Novi projekt', items: [], allowancePct: 0 }
+
+/** Validate stored or imported data; returns null when it is not a project */
+function parseProject(data: unknown): Project | null {
+  if (typeof data !== 'object' || data === null) return null
+  const p = data as Record<string, unknown>
+  if (p.format !== undefined && p.format !== FILE_FORMAT) return null
+  if (!Array.isArray(p.items)) return null
+  const allowance = Number(p.allowancePct)
+  return {
+    title: typeof p.title === 'string' && p.title.trim() ? p.title : EMPTY_PROJECT.title,
+    items: p.items
+      .filter((i): i is Partial<DuctItem> => typeof i === 'object' && i !== null)
+      // Fresh ids, so items copied by hand inside a file never share one
+      .map((i) => normalizeItem({ ...i, id: crypto.randomUUID() })),
+    allowancePct: Number.isFinite(allowance) ? Math.min(Math.max(allowance, 0), 100) : 0,
+  }
+}
+
 function loadProject(): Project {
-  const empty: Project = { title: 'Novi projekt', items: [], allowancePct: 0 }
   try {
     const raw = localStorage.getItem(PROJECT_KEY)
-    if (!raw) return empty
-    const p = JSON.parse(raw)
-    return {
-      title: typeof p.title === 'string' ? p.title : empty.title,
-      items: Array.isArray(p.items) ? p.items.map(normalizeItem) : [],
-      allowancePct: typeof p.allowancePct === 'number' ? p.allowancePct : 0,
-    }
+    return (raw && parseProject(JSON.parse(raw))) || EMPTY_PROJECT
   } catch {
-    return empty
+    return EMPTY_PROJECT
   }
+}
+
+/** File name base from the project title, without characters Windows rejects */
+function fileBase(title: string): string {
+  return title.replace(/[\\/:*?"<>|]+/g, ' ').trim().replace(/\s+/g, '_') || 'projekt'
+}
+
+function downloadFile(content: string, fileName: string, type: string) {
+  const blob = new Blob([content], { type })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 /** Returns false when the browser refuses to store the project */
@@ -42,6 +74,7 @@ function saveProject(project: Project): boolean {
 export default function App() {
   const [project, setProject] = useState<Project>(loadProject)
   const [saveOk, setSaveOk] = useState(true)
+  const fileInput = useRef<HTMLInputElement>(null)
   const { title: projectTitle, items, allowancePct } = project
 
   // Every change is written to the browser immediately
@@ -60,8 +93,38 @@ export default function App() {
   }
 
   function handleNew() {
-    if (items.length > 0 && !confirm('Pokrenuti novi projekt? Trenutni projekt bit će zamijenjen praznim (savjet: prije toga izvezite CSV).')) return
+    if (items.length > 0 && !confirm('Pokrenuti novi projekt? Trenutni projekt bit će zamijenjen praznim (savjet: prije toga ga spremite kao datoteku).')) return
     updateProject({ title: 'Novi projekt', items: [] })
+  }
+
+  function handleSaveFile() {
+    const data = {
+      format: FILE_FORMAT,
+      version: FILE_VERSION,
+      savedAt: new Date().toISOString(),
+      ...project,
+    }
+    downloadFile(JSON.stringify(data, null, 2), `${fileBase(projectTitle)}.json`, 'application/json')
+  }
+
+  async function handleOpenFile(e: ChangeEvent<HTMLInputElement>) {
+    const input = e.target
+    const file = input.files?.[0]
+    // Reset so the same file can be chosen again
+    input.value = ''
+    if (!file) return
+    let loaded: Project | null = null
+    try {
+      loaded = parseProject(JSON.parse(await file.text()))
+    } catch {
+      loaded = null
+    }
+    if (!loaded) {
+      alert(`Datoteka "${file.name}" nije ispravan projekt ovog kalkulatora.`)
+      return
+    }
+    if (items.length > 0 && !confirm(`Otvoriti projekt "${loaded.title}"? Trenutni projekt bit će zamijenjen.`)) return
+    updateProject(loaded)
   }
 
   function handleExportCSV() {
@@ -98,13 +161,7 @@ export default function App() {
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';'))
       .join('\n')
 
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${projectTitle.replace(/\s+/g, '_')}_masa_kanala.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadFile('\ufeff' + csv, `${fileBase(projectTitle)}_masa_kanala.csv`, 'text/csv;charset=utf-8;')
   }
 
   const totalSurface = items.reduce((s, i) => s + i.surfaceArea, 0)
@@ -141,6 +198,18 @@ export default function App() {
               className="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-sm rounded border border-blue-500 transition-colors">
               Novi projekt
             </button>
+            <button onClick={() => fileInput.current?.click()}
+              title="Učitaj projekt iz .json datoteke"
+              className="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-sm rounded border border-blue-500 transition-colors">
+              Otvori projekt
+            </button>
+            <button onClick={handleSaveFile}
+              title="Spremi projekt u .json datoteku"
+              className="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-sm rounded border border-blue-500 transition-colors">
+              Spremi projekt
+            </button>
+            <input ref={fileInput} type="file" accept=".json,application/json"
+              onChange={handleOpenFile} className="hidden" />
             <button onClick={handleExportCSV}
               className="px-3 py-1.5 bg-green-700 hover:bg-green-600 text-sm rounded border border-green-500 transition-colors">
               Izvoz CSV
