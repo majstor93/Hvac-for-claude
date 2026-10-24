@@ -1,31 +1,11 @@
 import type { DuctItem, ItemType, DuctShape, Material } from '../types'
 import { ITEM_TYPE_LABELS, MATERIAL_LABELS } from '../types'
 import { recalcItem } from '../utils/calculations'
-import { MATERIAL_DENSITY } from '../utils/constants'
+import { createEmpty } from '../utils/items'
 
 interface Props {
   items: DuctItem[]
   onChange: (items: DuctItem[]) => void
-}
-
-export function createEmpty(): DuctItem {
-  return {
-    id: crypto.randomUUID(),
-    name: '',
-    type: 'duct',
-    shape: 'rectangular',
-    a: 0, b: 0, d: 0,
-    a2: 0, b2: 0, d2: 0,
-    angle: 90,
-    length: 0,
-    isCount: false,
-    material: 'galvanized',
-    thicknessMode: 'auto',
-    thicknessManual: 0.6,
-    surfaceArea: 0,
-    thickness: 0.6,
-    mass: 0,
-  }
 }
 
 function needsSecondDim(type: ItemType) {
@@ -159,7 +139,7 @@ export default function DuctTable({ items, onChange }: Props) {
     label: l,
   }))
   const thicknessOptions = [
-    { value: 'auto' as const, label: 'Auto (DIN)' },
+    { value: 'auto' as const, label: 'Auto (tablica)' },
     { value: 'manual' as const, label: 'Ručno' },
   ]
 
@@ -330,8 +310,9 @@ export default function DuctTable({ items, onChange }: Props) {
                   ) : dash}
                 </td>
 
-                {/* length */}
+                {/* length (custom items take total surface instead) */}
                 <td className={td}>
+                  {isCustom ? dash : (
                   <div className="flex items-center">
                     <input
                       type="number" min={0} step={0.01}
@@ -342,6 +323,7 @@ export default function DuctTable({ items, onChange }: Props) {
                     />
                     <span className="text-gray-400 text-xs ml-0.5">{fitting ? 'kom' : 'm'}</span>
                   </div>
+                  )}
                 </td>
 
                 {/* material */}
@@ -385,13 +367,9 @@ export default function DuctTable({ items, onChange }: Props) {
                   {isCustom ? (
                     <Cell
                       type="number" min={0} step={0.01}
-                      value={item.surfaceArea || ''}
-                      onChange={(v) => {
-                        const sa = num(v)
-                        const density = MATERIAL_DENSITY[item.material]
-                        const mass = sa * (item.thickness / 1000) * density
-                        onChange(items.map((i) => i.id === item.id ? { ...i, surfaceArea: sa, mass } : i))
-                      }}
+                      value={item.surfaceManual || ''}
+                      onChange={(v) => update(item.id, { surfaceManual: num(v) })}
+                      placeholder="m²"
                     />
                   ) : (
                     <span className="block text-center text-xs font-medium text-gray-700 px-1">
@@ -437,7 +415,7 @@ export default function DuctTable({ items, onChange }: Props) {
           {items.length > 0 && (
             <tr className="bg-blue-50 border-t-2 border-blue-400 font-semibold">
               <td colSpan={14} className="border border-gray-300 px-2 py-1.5 text-right text-sm text-gray-600">
-                UKUPNO:
+                UKUPNO (neto):
               </td>
               <td className="border border-gray-300 px-1 py-1.5 text-center text-sm">
                 {totalSurface.toFixed(3)} m²

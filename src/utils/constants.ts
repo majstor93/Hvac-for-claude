@@ -1,6 +1,8 @@
 import type { Material } from '../types'
 
-// Sheet thickness per DIN 24153 (mm)
+// Orientation sheet thickness (mm), common practice for low-pressure ducts.
+// Current EN 1505/1506 (dimensions) and EN 1507/12237 (strength, leakage)
+// do not tabulate a fixed thickness; check project or fabricator requirements.
 // Rectangular: based on longest side (mm)
 export const RECT_THICKNESS_TABLE: Array<{ maxSide: number; thickness: number }> = [
   { maxSide: 400, thickness: 0.6 },
@@ -24,6 +26,11 @@ export const MATERIAL_DENSITY: Record<Material, number> = {
   stainless: 7900,
   aluminum: 2700,
 }
+
+// T-piece: main duct runs 100 mm past the branch on each side (m)
+export const TEE_COLLAR = 0.1
+// T-piece: length of the branch stub from the main duct wall (m)
+export const TEE_BRANCH_LENGTH = 0.15
 
 // Standard bend radius for elbows: inner radius = largest duct dimension
 export const ELBOW_INNER_RADIUS_FACTOR = 1.0 // R_inner = a * factor

@@ -3,9 +3,11 @@ import {
   RECT_THICKNESS_TABLE,
   ROUND_THICKNESS_TABLE,
   MATERIAL_DENSITY,
+  TEE_COLLAR,
+  TEE_BRANCH_LENGTH,
 } from './constants'
 
-/** Auto sheet thickness by DIN 24153 */
+/** Auto sheet thickness from the orientation table */
 export function getAutoThickness(item: DuctItem): number {
   if (item.shape === 'rectangular') {
     const maxSide = Math.max(item.a || 0, item.b || 0)
@@ -64,8 +66,9 @@ function surfacePerUnit(item: DuctItem): number {
       if (item.shape === 'rectangular') {
         // Length of reducer cone (assume 45° slope → L = max((a-a2)/2, (b-b2)/2))
         const L = Math.max(Math.abs(a - a2) / 2, Math.abs(b - b2) / 2) + 0.15 // min 150mm
-        const h1 = Math.sqrt(L * L + ((a - a2) / 2) ** 2)
-        const h2 = Math.sqrt(L * L + ((b - b2) / 2) ** 2)
+        // Faces of width a→a2 slope by the change of b, faces of width b→b2 by the change of a
+        const h1 = Math.sqrt(L * L + ((b - b2) / 2) ** 2)
+        const h2 = Math.sqrt(L * L + ((a - a2) / 2) ** 2)
         return (a + a2) * h1 + (b + b2) * h2
       } else {
         // Conical reducer
@@ -76,15 +79,22 @@ function surfacePerUnit(item: DuctItem): number {
     }
 
     case 'tpiece': {
+      // Main duct section (branch width + collar on both sides) minus the
+      // branch opening, plus the branch stub. Branch defaults to main size.
       if (item.shape === 'rectangular') {
-        // Main duct stub (half perimeter * branch height) + branch stub
-        // Simplified: main half + branch opening + branch duct stub
+        const branchW = a2 || a // along the main duct axis
         const branchH = b2 || b
-        const branchW = a2 || a
-        return (2 * (a + b) * (branchH / 2)) + (2 * (branchW + branchH) * branchW * 0.5)
+        const mainL = branchW + 2 * TEE_COLLAR
+        const main = 2 * (a + b) * mainL - branchW * branchH
+        const branch = 2 * (branchW + branchH) * TEE_BRANCH_LENGTH
+        return main + branch
       } else {
         const dBranch = d2 || d
-        return Math.PI * d * dBranch * 0.5 + Math.PI * dBranch * dBranch * 0.5
+        const mainL = dBranch + 2 * TEE_COLLAR
+        // Opening taken as the branch cross-section (saddle shape neglected)
+        const main = Math.PI * d * mainL - Math.PI * (dBranch / 2) ** 2
+        const branch = Math.PI * dBranch * TEE_BRANCH_LENGTH
+        return main + branch
       }
     }
 
@@ -104,7 +114,8 @@ function surfacePerUnit(item: DuctItem): number {
 
 /** Calculate surface area in m² */
 export function calcSurfaceArea(item: DuctItem): number {
-  if (item.type === 'custom') return 0
+  // Custom items: total surface is entered by the user
+  if (item.type === 'custom') return item.surfaceManual || 0
   const perUnit = surfacePerUnit(item)
   // For ducts: multiply by length (m); for fittings: multiply by quantity (pieces)
   return perUnit * (item.length || 0)
@@ -126,7 +137,7 @@ export function calcMass(surfaceArea: number, thicknessMm: number, material: Mat
 /** Fully calculate a DuctItem and return updated fields */
 export function recalcItem(item: DuctItem): DuctItem {
   const thickness = resolveThickness(item)
-  let surfaceArea = calcSurfaceArea(item)
+  const surfaceArea = calcSurfaceArea(item)
   const mass = calcMass(surfaceArea, thickness, item.material)
   return { ...item, thickness, surfaceArea, mass }
 }
