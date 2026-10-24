@@ -64,8 +64,9 @@ function surfacePerUnit(item: DuctItem): number {
       if (item.shape === 'rectangular') {
         // Length of reducer cone (assume 45° slope → L = max((a-a2)/2, (b-b2)/2))
         const L = Math.max(Math.abs(a - a2) / 2, Math.abs(b - b2) / 2) + 0.15 // min 150mm
-        const h1 = Math.sqrt(L * L + ((a - a2) / 2) ** 2)
-        const h2 = Math.sqrt(L * L + ((b - b2) / 2) ** 2)
+        // Faces of width a→a2 slope by the change of b, faces of width b→b2 by the change of a
+        const h1 = Math.sqrt(L * L + ((b - b2) / 2) ** 2)
+        const h2 = Math.sqrt(L * L + ((a - a2) / 2) ** 2)
         return (a + a2) * h1 + (b + b2) * h2
       } else {
         // Conical reducer
@@ -104,7 +105,8 @@ function surfacePerUnit(item: DuctItem): number {
 
 /** Calculate surface area in m² */
 export function calcSurfaceArea(item: DuctItem): number {
-  if (item.type === 'custom') return 0
+  // Custom items: total surface is entered by the user
+  if (item.type === 'custom') return item.surfaceManual || 0
   const perUnit = surfacePerUnit(item)
   // For ducts: multiply by length (m); for fittings: multiply by quantity (pieces)
   return perUnit * (item.length || 0)
@@ -126,7 +128,7 @@ export function calcMass(surfaceArea: number, thicknessMm: number, material: Mat
 /** Fully calculate a DuctItem and return updated fields */
 export function recalcItem(item: DuctItem): DuctItem {
   const thickness = resolveThickness(item)
-  let surfaceArea = calcSurfaceArea(item)
+  const surfaceArea = calcSurfaceArea(item)
   const mass = calcMass(surfaceArea, thickness, item.material)
   return { ...item, thickness, surfaceArea, mass }
 }

@@ -1,73 +1,89 @@
-# React + TypeScript + Vite
+# HVAC — Masa kanala i fazona
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Web kalkulator **površine i mase limenih ventilacijskih kanala i fazona** (pravokutnih i okruglih) za izradu specifikacija, troškovnika i narudžbi lima.
 
-Currently, two official plugins are available:
+## Mogućnosti
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Tablični unos stavki: kanal, koljeno 90° / 45° / proizvoljni kut, redukcija, T-komad, čep i prilagođena stavka s ručno upisanom površinom
+- Pravokutni (a × b) i okrugli (Ø d) presjeci
+- Automatska debljina lima prema tablici (ili ručni unos)
+- Materijali: pocinčani čelik, nehrđajući čelik, aluminij
+- **Dodatak za spojeve, prirubnice i ukrute** u % neto mase (tipično 10–20 %)
+- Zbroj površine i mase te pregled po materijalu
+- **Automatsko spremanje** projekta u preglednik (`localStorage`) kod svake promjene
+- Izvoz u CSV (separator `;`, UTF-8 s BOM-om, otvara se izravno u Excelu)
+- Ispis / PDF u formatu A4 landscape sa zaglavljem projekta
 
-## React Compiler
+## Jedinice unosa
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Podatak | Jedinica |
+|---|---|
+| Dimenzije a, b, d, a₂, b₂, d₂ | mm |
+| Duljina kanala | m |
+| Fazone | kom |
+| Površina prilagođene stavke | m² (ukupno) |
+| Debljina lima δ | mm |
 
-## Expanding the ESLint configuration
+## Formule
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Masa: **m = S × δ × ρ**, a ukupna masa: **m_ukupno = m × (1 + dodatak / 100)**
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Element | Pravokutni | Okrugli |
+|---|---|---|
+| Kanal | S = 2(a + b) · L | S = π · d · L |
+| Koljeno (kut θ) | R = a; S = θ(2R + a)·b + θ·a(2R + a) | R_c = 1,5·d; S = π·d·θ·R_c |
+| Redukcija | L = max(\|a−a₂\|, \|b−b₂\|)/2 + 150 mm; S = (a+a₂)·h₁ + (b+b₂)·h₂, h₁ = √(L² + ((b−b₂)/2)²), h₂ = √(L² + ((a−a₂)/2)²) | L = \|d−d₂\|/2 + 150 mm; S = π(d+d₂)/2 · √(L² + ((d−d₂)/2)²) |
+| T-komad | približna procjena | približna procjena |
+| Čep | S = a · b | S = π · d² / 4 |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Debljina lima (automatski)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Pravokutni — najveća stranica | δ (mm) | Okrugli — Ø | δ (mm) |
+|---|---|---|---|
+| ≤ 400 mm | 0,6 | ≤ 315 mm | 0,6 |
+| ≤ 800 mm | 0,8 | ≤ 630 mm | 0,8 |
+| ≤ 1250 mm | 1,0 | ≤ 1000 mm | 1,0 |
+| ≤ 2000 mm | 1,25 | > 1000 mm | 1,25 |
+| > 2000 mm | 1,5 | | |
+
+### Gustoće materijala
+
+| Materijal | ρ (kg/m³) |
+|---|---|
+| Pocinčani čelik | 7850 |
+| Nehrđajući čelik | 7900 |
+| Aluminij | 2700 |
+
+## Pokretanje
+
+Potreban je Node.js 22 ili noviji.
+
+```bash
+npm install
+npm run dev       # razvojni server na http://localhost:5173
+npm run build     # produkcijski build u mapu dist/
+npm run preview   # pregled produkcijskog builda
+npm run lint      # provjera koda (ESLint)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Struktura
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+├── App.tsx                  # glavni ekran, spremanje, dodatak, CSV, ispis
+├── types.ts                 # modeli podataka i hrvatski nazivi
+├── components/DuctTable.tsx # tablica za unos stavki
+└── utils/
+    ├── calculations.ts      # formule za površinu, debljinu i masu
+    ├── constants.ts         # tablice debljina lima i gustoće
+    └── items.ts             # nova stavka i učitavanje spremljenih stavki
+```
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) kod svakog pusha i pull requesta pokreće `npm ci`, `npm run lint` i `npm run build`.
+
+## Napomene
+
+- Podaci se spremaju samo u preglednik na tom računalu. Ako se obriše povijest preglednika, projekt se gubi. Za arhivu koristite **Izvoz CSV**.
+- Površina T-komada je približna procjena. Za točan iznos koristite stavku tipa *Prilagođeno*.

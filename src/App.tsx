@@ -1,54 +1,67 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import type { DuctItem } from './types'
 import { MATERIAL_LABELS } from './types'
 import DuctTable from './components/DuctTable'
-import { recalcItem } from './utils/calculations'
+import { normalizeItem } from './utils/items'
 
 const PROJECT_KEY = 'hvac_project_v1'
 
-function loadProject(): { title: string; items: DuctItem[] } {
-  try {
-    const raw = localStorage.getItem(PROJECT_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return { title: 'Novi projekt', items: [] }
+interface Project {
+  title: string
+  items: DuctItem[]
+  // Allowance for seams, flanges and stiffeners (% of net mass)
+  allowancePct: number
 }
 
-function saveProject(title: string, items: DuctItem[]) {
+function loadProject(): Project {
+  const empty: Project = { title: 'Novi projekt', items: [], allowancePct: 0 }
   try {
-    localStorage.setItem(PROJECT_KEY, JSON.stringify({ title, items }))
-  } catch {}
+    const raw = localStorage.getItem(PROJECT_KEY)
+    if (!raw) return empty
+    const p = JSON.parse(raw)
+    return {
+      title: typeof p.title === 'string' ? p.title : empty.title,
+      items: Array.isArray(p.items) ? p.items.map(normalizeItem) : [],
+      allowancePct: typeof p.allowancePct === 'number' ? p.allowancePct : 0,
+    }
+  } catch {
+    return empty
+  }
+}
+
+/** Returns false when the browser refuses to store the project */
+function saveProject(project: Project): boolean {
+  try {
+    localStorage.setItem(PROJECT_KEY, JSON.stringify(project))
+    return true
+  } catch {
+    return false
+  }
 }
 
 export default function App() {
-  const [projectTitle, setProjectTitleState] = useState(() => loadProject().title)
-  const [items, setItemsState] = useState<DuctItem[]>(() => {
-    const p = loadProject()
-    return p.items.map(recalcItem)
-  })
-  const [saved, setSaved] = useState(false)
+  const [project, setProject] = useState<Project>(loadProject)
+  const [saveOk, setSaveOk] = useState(true)
+  const { title: projectTitle, items, allowancePct } = project
 
-  const setItems = useCallback((newItems: DuctItem[]) => {
-    setItemsState(newItems)
-    setSaved(false)
-  }, [])
-
-  const setProjectTitle = (t: string) => {
-    setProjectTitleState(t)
-    setSaved(false)
+  // Every change is written to the browser immediately
+  function updateProject(patch: Partial<Project>) {
+    const next = { ...project, ...patch }
+    setProject(next)
+    setSaveOk(saveProject(next))
   }
 
-  function handleSave() {
-    saveProject(projectTitle, items)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  const setItems = (newItems: DuctItem[]) => updateProject({ items: newItems })
+  const setProjectTitle = (t: string) => updateProject({ title: t })
+
+  function setAllowance(v: string) {
+    const n = parseFloat(v)
+    updateProject({ allowancePct: isNaN(n) ? 0 : Math.min(Math.max(n, 0), 100) })
   }
 
   function handleNew() {
-    if (items.length > 0 && !confirm('Pokrenuti novi projekt? Trenutni podaci neće biti automatski spremljeni.')) return
-    setItemsState([])
-    setProjectTitleState('Novi projekt')
-    setSaved(false)
+    if (items.length > 0 && !confirm('Pokrenuti novi projekt? Trenutni projekt bit će zamijenjen praznim (savjet: prije toga izvezite CSV).')) return
+    updateProject({ title: 'Novi projekt', items: [] })
   }
 
   function handleExportCSV() {
@@ -68,18 +81,20 @@ export default function App() {
       item.a2 || '',
       item.shape === 'rectangular' ? (item.b2 || '') : (item.d2 || ''),
       item.type === 'elbow_custom' ? item.angle : '',
-      item.length,
+      item.type === 'custom' ? '' : item.length,
       MATERIAL_LABELS[item.material],
       item.thickness.toFixed(2),
       item.surfaceArea.toFixed(3),
       item.mass.toFixed(2),
     ])
-    const totalSurface = items.reduce((s, i) => s + i.surfaceArea, 0)
-    const totalMass = items.reduce((s, i) => s + i.mass, 0)
-    const totals = ['UKUPNO', '', '', '', '', '', '', '', '', '', '', '', '',
-      totalSurface.toFixed(3), totalMass.toFixed(2)]
+    const pad = Array(12).fill('')
+    const totals = [
+      ['UKUPNO (neto)', ...pad, totalSurface.toFixed(3), netMass.toFixed(2)],
+      [`Dodatak za spojeve (${allowancePct} %)`, ...pad, '', allowanceMass.toFixed(2)],
+      ['UKUPNO S DODATKOM', ...pad, '', totalMass.toFixed(2)],
+    ]
 
-    const csv = [header, ...rows, [], totals]
+    const csv = [header, ...rows, [], ...totals]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';'))
       .join('\n')
 
@@ -93,7 +108,9 @@ export default function App() {
   }
 
   const totalSurface = items.reduce((s, i) => s + i.surfaceArea, 0)
-  const totalMass = items.reduce((s, i) => s + i.mass, 0)
+  const netMass = items.reduce((s, i) => s + i.mass, 0)
+  const allowanceMass = netMass * allowancePct / 100
+  const totalMass = netMass + allowanceMass
 
   const byMaterial = items.reduce<Record<string, { surface: number; mass: number }>>((acc, item) => {
     if (!acc[item.material]) acc[item.material] = { surface: 0, mass: 0 }
@@ -124,12 +141,6 @@ export default function App() {
               className="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-sm rounded border border-blue-500 transition-colors">
               Novi projekt
             </button>
-            <button onClick={handleSave}
-              className={`px-3 py-1.5 text-sm rounded border transition-colors font-medium ${
-                saved ? 'bg-green-600 border-green-500' : 'bg-blue-700 hover:bg-blue-600 border-blue-500'
-              }`}>
-              {saved ? '✓ Spremljeno' : 'Spremi'}
-            </button>
             <button onClick={handleExportCSV}
               className="px-3 py-1.5 bg-green-700 hover:bg-green-600 text-sm rounded border border-green-500 transition-colors">
               Izvoz CSV
@@ -148,7 +159,9 @@ export default function App() {
         <div className="flex gap-6 text-sm text-gray-600 mt-1">
           <span>Projekt: <strong>{projectTitle}</strong></span>
           <span>Datum: <strong>{new Date().toLocaleDateString('hr-HR')}</strong></span>
-          <span>Ukupna masa: <strong>{totalMass.toFixed(2)} kg</strong></span>
+          <span>Ukupna masa: <strong>{totalMass.toFixed(2)} kg</strong>
+            {allowancePct > 0 && <> (neto {netMass.toFixed(2)} kg + {allowancePct} % dodatak)</>}
+          </span>
           <span>Ukupna površina: <strong>{totalSurface.toFixed(3)} m²</strong></span>
         </div>
       </div>
@@ -164,7 +177,29 @@ export default function App() {
             className="flex-1 max-w-sm px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white shadow-sm"
             placeholder="Upiši naziv projekta..."
           />
-          <span className="text-xs text-gray-400">(automatski se sprema u preglednik)</span>
+          {saveOk ? (
+            <span className="text-xs text-green-700">✓ Automatski spremljeno u preglednik</span>
+          ) : (
+            <span className="text-xs text-red-600 font-medium">
+              ⚠ Spremanje nije uspjelo (preglednik blokira ili je spremište puno) — izvezite CSV
+            </span>
+          )}
+        </div>
+
+        {/* Allowance row */}
+        <div className="mb-4 flex items-center gap-3 flex-wrap print:hidden">
+          <label className="text-sm font-medium text-gray-600 whitespace-nowrap">
+            Dodatak za spojeve, prirubnice i ukrute:
+          </label>
+          <input
+            type="number" min={0} max={100} step={1}
+            value={allowancePct || ''}
+            onChange={(e) => setAllowance(e.target.value)}
+            placeholder="0"
+            className="w-20 px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white shadow-sm"
+          />
+          <span className="text-sm text-gray-600">%</span>
+          <span className="text-xs text-gray-400">(tipično 10–20 % neto mase lima)</span>
         </div>
 
         {/* Info */}
@@ -190,9 +225,13 @@ export default function App() {
                 <p className="text-sm text-gray-500">m²</p>
               </div>
               <div className="bg-blue-700 text-white rounded-lg shadow-sm p-4">
-                <p className="text-xs text-blue-200 uppercase tracking-wide font-medium">Ukupna masa</p>
+                <p className="text-xs text-blue-200 uppercase tracking-wide font-medium">
+                  Ukupna masa{allowancePct > 0 ? ' s dodatkom' : ''}
+                </p>
                 <p className="text-3xl font-bold mt-1">{totalMass.toFixed(1)}</p>
-                <p className="text-sm text-blue-200">kg</p>
+                <p className="text-sm text-blue-200">
+                  kg{allowancePct > 0 && <> · neto {netMass.toFixed(1)} + {allowanceMass.toFixed(1)} ({allowancePct} %)</>}
+                </p>
               </div>
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Broj stavki</p>
@@ -200,9 +239,9 @@ export default function App() {
                 <p className="text-sm text-gray-500">redaka</p>
               </div>
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Avg. masa/površina</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Prosj. masa lima (neto)</p>
                 <p className="text-3xl font-bold text-gray-800 mt-1">
-                  {totalSurface > 0 ? (totalMass / totalSurface).toFixed(1) : '—'}
+                  {totalSurface > 0 ? (netMass / totalSurface).toFixed(1) : '—'}
                 </p>
                 <p className="text-sm text-gray-500">kg/m²</p>
               </div>
@@ -216,7 +255,7 @@ export default function App() {
                     <tr className="border-b border-gray-200 text-xs text-gray-500 uppercase">
                       <th className="text-left pb-2 font-medium">Materijal</th>
                       <th className="text-right pb-2 font-medium">Površina (m²)</th>
-                      <th className="text-right pb-2 font-medium">Masa (kg)</th>
+                      <th className="text-right pb-2 font-medium">Masa neto (kg)</th>
                       <th className="text-right pb-2 font-medium">Udio</th>
                     </tr>
                   </thead>
@@ -227,7 +266,7 @@ export default function App() {
                         <td className="text-right py-1.5">{val.surface.toFixed(3)}</td>
                         <td className="text-right py-1.5 font-semibold">{val.mass.toFixed(2)}</td>
                         <td className="text-right py-1.5 text-gray-500">
-                          {totalMass > 0 ? ((val.mass / totalMass) * 100).toFixed(1) : '0'}%
+                          {netMass > 0 ? ((val.mass / netMass) * 100).toFixed(1) : '0'}%
                         </td>
                       </tr>
                     ))}
@@ -251,11 +290,13 @@ export default function App() {
                 <li><strong>Okrugli kanal:</strong> S = π×d × L [m²]</li>
                 <li><strong>Koljeno 90° pravokutno</strong> (R=a):<br/>S = π/2 × (a+b) × (2a+a) [m²]</li>
                 <li><strong>Koljeno 90° okruglo</strong> (R_c=1.5d):<br/>S = π²×d×1.5d/2 [m²]</li>
-                <li><strong>Redukcija pravokutna:</strong><br/>S = (a+a₂)×h₁ + (b+b₂)×h₂</li>
+                <li><strong>Redukcija pravokutna</strong> (L = max(|a−a₂|, |b−b₂|)/2 + 150 mm):<br/>
+                  S = (a+a₂)×h₁ + (b+b₂)×h₂, h₁ = √(L²+((b−b₂)/2)²), h₂ = √(L²+((a−a₂)/2)²)</li>
                 <li><strong>Čep:</strong> S = a×b ili π×(d/2)²</li>
               </ul>
               <p className="mt-3 font-semibold text-gray-700">Masa:</p>
               <p>m = S × δ × ρ [kg]</p>
+              <p className="mt-1">m_ukupno = m × (1 + dodatak/100)</p>
             </div>
             <div>
               <h3 className="font-semibold text-gray-700 mb-2">Debljina lima — DIN 24153 (mm)</h3>

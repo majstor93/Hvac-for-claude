@@ -30,12 +30,13 @@ export interface DuctItem {
   angle: number
   // Quantity or length
   length: number        // meters for duct, pieces for fittings
-  isCount: boolean      // true = pieces, false = meters
   // Material
   material: Material
   // Sheet thickness
   thicknessMode: 'auto' | 'manual'
   thicknessManual: number // mm
+  // Manually entered total surface for 'custom' items (m²)
+  surfaceManual: number
   // Calculated (readonly)
   surfaceArea: number   // m²
   thickness: number     // mm (resolved)
