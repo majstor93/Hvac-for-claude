@@ -6,7 +6,7 @@ Web kalkulator **površine i mase limenih ventilacijskih kanala i fazona** (prav
 
 - Tablični unos stavki: kanal, koljeno 90° / 45° / proizvoljni kut, redukcija, T-komad, čep i prilagođena stavka s ručno upisanom površinom
 - Pravokutni (a × b) i okrugli (Ø d) presjeci
-- Automatska debljina lima prema tablici (ili ručni unos)
+- Automatska debljina lima iz orijentacijske tablice (ili ručni unos)
 - Materijali: pocinčani čelik, nehrđajući čelik, aluminij
 - **Dodatak za spojeve, prirubnice i ukrute** u % neto mase (tipično 10–20 %)
 - Zbroj površine i mase te pregled po materijalu
@@ -34,10 +34,14 @@ Masa: **m = S × δ × ρ**, a ukupna masa: **m_ukupno = m × (1 + dodatak / 100
 | Kanal | S = 2(a + b) · L | S = π · d · L |
 | Koljeno (kut θ) | R = a; S = θ(2R + a)·b + θ·a(2R + a) | R_c = 1,5·d; S = π·d·θ·R_c |
 | Redukcija | L = max(\|a−a₂\|, \|b−b₂\|)/2 + 150 mm; S = (a+a₂)·h₁ + (b+b₂)·h₂, h₁ = √(L² + ((b−b₂)/2)²), h₂ = √(L² + ((a−a₂)/2)²) | L = \|d−d₂\|/2 + 150 mm; S = π(d+d₂)/2 · √(L² + ((d−d₂)/2)²) |
-| T-komad | približna procjena | približna procjena |
+| T-komad | L₁ = a₂ + 2·100 mm; S = 2(a+b)·L₁ − a₂·b₂ + 2(a₂+b₂)·0,15 | L₁ = d₂ + 2·100 mm; S = π·d·L₁ − π·d₂²/4 + π·d₂·0,15 |
 | Čep | S = a · b | S = π · d² / 4 |
 
-### Debljina lima (automatski)
+### T-komad
+
+Model: ravni dio glavnog kanala duljine širine ogranka uvećane za 100 mm sa svake strane (`TEE_COLLAR`), umanjen za otvor ogranka, plus ogranak duljine 150 mm (`TEE_BRANCH_LENGTH`). Obje vrijednosti su u `src/utils/constants.ts`. a₂ je dimenzija ogranka uzduž glavnog kanala. Ako dimenzije ogranka nisu upisane, uzimaju se dimenzije glavnog kanala. Kod okruglog T-komada otvor se računa kao presjek ogranka (π·d₂²/4); stvarni sedlasti otvor je nešto veći kad je d₂ blizu d.
+
+### Debljina lima (automatski, orijentacijski)
 
 | Pravokutni — najveća stranica | δ (mm) | Okrugli — Ø | δ (mm) |
 |---|---|---|---|
@@ -46,6 +50,8 @@ Masa: **m = S × δ × ρ**, a ukupna masa: **m_ukupno = m × (1 + dodatak / 100
 | ≤ 1250 mm | 1,0 | ≤ 1000 mm | 1,0 |
 | ≤ 2000 mm | 1,25 | > 1000 mm | 1,25 |
 | > 2000 mm | 1,5 | | |
+
+Ovo su orijentacijske vrijednosti uobičajene prakse za niskotlačne kanale. Ranije navedena „DIN 24153” bila je pogrešna referenca: ta norma iz 1966. odnosi se na cijevi za spojeve s bordurom („Rohre für Bördelverbindungen”). Za debljinu lima povijesno su se koristili DIN 24190 (pravokutni kanali, povučena) i DIN 24145 (spiralne cijevi). Važeće EN 1505 / EN 1506 (dimenzije) i EN 1507 / EN 12237 (čvrstoća i nepropusnost) ne propisuju fiksnu debljinu. Ako projekt ili izvođač zahtijeva drugu debljinu, koristite „Ručno”.
 
 ### Gustoće materijala
 
@@ -104,4 +110,4 @@ GitHub Actions (`.github/workflows/ci.yml`) kod svakog pusha i pull requesta pok
 ## Napomene
 
 - Automatsko spremanje vrijedi samo u pregledniku na tom računalu. Ako se obriše povijest preglednika, projekt se gubi. Za arhivu koristite **Spremi projekt** (.json). CSV služi za Excel i ne može se ponovno otvoriti u kalkulatoru.
-- Površina T-komada je približna procjena. Za točan iznos koristite stavku tipa *Prilagođeno*.
+- T-komad se računa po gornjem modelu. Za posebne izvedbe (npr. kosi ogranak, ogranak s prijelazom) koristite stavku tipa *Prilagođeno*.

@@ -3,9 +3,11 @@ import {
   RECT_THICKNESS_TABLE,
   ROUND_THICKNESS_TABLE,
   MATERIAL_DENSITY,
+  TEE_COLLAR,
+  TEE_BRANCH_LENGTH,
 } from './constants'
 
-/** Auto sheet thickness by DIN 24153 */
+/** Auto sheet thickness from the orientation table */
 export function getAutoThickness(item: DuctItem): number {
   if (item.shape === 'rectangular') {
     const maxSide = Math.max(item.a || 0, item.b || 0)
@@ -77,15 +79,22 @@ function surfacePerUnit(item: DuctItem): number {
     }
 
     case 'tpiece': {
+      // Main duct section (branch width + collar on both sides) minus the
+      // branch opening, plus the branch stub. Branch defaults to main size.
       if (item.shape === 'rectangular') {
-        // Main duct stub (half perimeter * branch height) + branch stub
-        // Simplified: main half + branch opening + branch duct stub
+        const branchW = a2 || a // along the main duct axis
         const branchH = b2 || b
-        const branchW = a2 || a
-        return (2 * (a + b) * (branchH / 2)) + (2 * (branchW + branchH) * branchW * 0.5)
+        const mainL = branchW + 2 * TEE_COLLAR
+        const main = 2 * (a + b) * mainL - branchW * branchH
+        const branch = 2 * (branchW + branchH) * TEE_BRANCH_LENGTH
+        return main + branch
       } else {
         const dBranch = d2 || d
-        return Math.PI * d * dBranch * 0.5 + Math.PI * dBranch * dBranch * 0.5
+        const mainL = dBranch + 2 * TEE_COLLAR
+        // Opening taken as the branch cross-section (saddle shape neglected)
+        const main = Math.PI * d * mainL - Math.PI * (dBranch / 2) ** 2
+        const branch = Math.PI * dBranch * TEE_BRANCH_LENGTH
+        return main + branch
       }
     }
 

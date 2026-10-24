@@ -275,7 +275,9 @@ export default function App() {
         <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 print:hidden">
           <strong>Uputa za unos:</strong> Dimenzije su u <strong>milimetrima</strong>.
           Duljina kanala u <strong>metrima</strong>, fazone unosite po <strong>komadima</strong>.
-          Debljina lima se automatski određuje prema <strong>DIN 24153</strong> ovisno o dimenzijama kanala.
+          Debljina lima se automatski određuje iz <strong>orijentacijske tablice</strong> ovisno o dimenzijama kanala;
+          ako projekt ili izvođač propisuje drugu debljinu, odaberite „Ručno”.
+          Kod redukcije i T-komada a₂ × b₂ (ili d₂) je drugi presjek, odnosno ogranak (a₂ uzduž glavnog kanala).
           Za prilagođenu stavku (tip "Prilagođeno") ručno unesite površinu.
         </div>
 
@@ -361,6 +363,10 @@ export default function App() {
                 <li><strong>Koljeno 90° okruglo</strong> (R_c=1.5d):<br/>S = π²×d×1.5d/2 [m²]</li>
                 <li><strong>Redukcija pravokutna</strong> (L = max(|a−a₂|, |b−b₂|)/2 + 150 mm):<br/>
                   S = (a+a₂)×h₁ + (b+b₂)×h₂, h₁ = √(L²+((b−b₂)/2)²), h₂ = √(L²+((a−a₂)/2)²)</li>
+                <li><strong>T-komad pravokutni</strong> (L₁ = a₂ + 2×100 mm, ogranak 150 mm):<br/>
+                  S = 2(a+b)×L₁ − a₂×b₂ + 2(a₂+b₂)×0,15</li>
+                <li><strong>T-komad okrugli</strong> (L₁ = d₂ + 2×100 mm, ogranak 150 mm):<br/>
+                  S = π×d×L₁ − π×d₂²/4 + π×d₂×0,15</li>
                 <li><strong>Čep:</strong> S = a×b ili π×(d/2)²</li>
               </ul>
               <p className="mt-3 font-semibold text-gray-700">Masa:</p>
@@ -368,7 +374,7 @@ export default function App() {
               <p className="mt-1">m_ukupno = m × (1 + dodatak/100)</p>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-700 mb-2">Debljina lima — DIN 24153 (mm)</h3>
+              <h3 className="font-semibold text-gray-700 mb-2">Debljina lima — orijentacijske vrijednosti (mm)</h3>
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-50 text-gray-600 font-medium">
@@ -396,6 +402,11 @@ export default function App() {
                   ))}
                 </tbody>
               </table>
+              <p className="mt-2 text-gray-500">
+                Uobičajena praksa za niskotlačne kanale. Važeće norme EN 1505 / EN 1506 (dimenzije) i
+                EN 1507 / EN 12237 (čvrstoća i nepropusnost) ne propisuju fiksnu debljinu — mjerodavni su
+                zahtjevi projekta i izvođača.
+              </p>
               <p className="mt-3 font-semibold text-gray-700">Gustoće materijala:</p>
               <ul className="space-y-0.5 mt-1">
                 <li>Pocinčani čelik: 7850 kg/m³</li>
@@ -408,7 +419,7 @@ export default function App() {
       </main>
 
       <footer className="mt-8 py-3 text-center text-xs text-gray-400 border-t border-gray-200 print:hidden">
-        HVAC Kalkulator mase kanala · DIN 24153 · Pocinčani čelik, nehrđajući čelik, aluminij
+        HVAC Kalkulator mase kanala · Pocinčani čelik, nehrđajući čelik, aluminij
       </footer>
     </div>
   )

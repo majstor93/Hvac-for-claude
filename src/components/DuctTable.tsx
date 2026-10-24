@@ -139,7 +139,7 @@ export default function DuctTable({ items, onChange }: Props) {
     label: l,
   }))
   const thicknessOptions = [
-    { value: 'auto' as const, label: 'Auto (DIN)' },
+    { value: 'auto' as const, label: 'Auto (tablica)' },
     { value: 'manual' as const, label: 'Ručno' },
   ]
 
